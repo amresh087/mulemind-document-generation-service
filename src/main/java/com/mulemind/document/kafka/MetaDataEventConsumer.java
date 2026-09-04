@@ -9,6 +9,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import com.mulemind.document.client.JobServiceClient;
 import com.mulemind.document.dto.MetadataGeneratedEvent;
+import com.mulemind.document.service.DocumentGenerationService;
 import com.mulemind.document.util.TransformationStatus;
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +21,7 @@ public class MetaDataEventConsumer {
 
 
     private final JobServiceClient jobServiceClient;
+    private final DocumentGenerationService documentGenerationService;
 
     @Value("${app.scan-event.type:MULE_APPLICATION_SCANNED}")
     private String scanEventType;
@@ -41,15 +43,27 @@ public class MetaDataEventConsumer {
             log.warn("Received null Kafka event from topic {}", metadataGeneratedTopic);
             return;
         }
-        // Update job status to SCANNING
         updateJobStatus(event, TransformationStatus.DOCUMENT_GENERATING);
+
+        try {
+            String objectName = documentGenerationService.generateAndStore(event);
+            updateJobStatus(event, TransformationStatus.COMPLETED,"Documentation stored in MinIO: " + objectName);
+        } catch (Exception exception) {
+            log.error("Unable to generate document for {}", event.getDocumentId(), exception);
+            documentGenerationService.saveFailedResult(event);
+            updateJobStatus(event, TransformationStatus.FAILED, exception.getMessage());
+        }
     }
 
 
     private void updateJobStatus(MetadataGeneratedEvent event, TransformationStatus status) {
+        updateJobStatus(event, status, status.getDescription());
+    }
+
+    private void updateJobStatus(MetadataGeneratedEvent event, TransformationStatus status, String description) {
         Map<String, String> payload = new HashMap<>();
         payload.put("status", status.name());
-        payload.put("description", status.getDescription());
+        payload.put("description", description == null ? status.getDescription() : description);
         jobServiceClient.updateJobStatus(event.getDocumentId(), payload);
     }
 }
