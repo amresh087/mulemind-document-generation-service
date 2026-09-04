@@ -14,9 +14,9 @@ import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
-public class TransformationEventConsumer {
+public class MetaDataEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(TransformationEventConsumer.class);
+    private static final Logger log = LoggerFactory.getLogger(MetaDataEventConsumer.class);
 
 
     private final JobServiceClient jobServiceClient;
@@ -27,22 +27,22 @@ public class TransformationEventConsumer {
     @Value("${app.scan-event.version:1.0}")
     private String scanEventVersion;
 
+    @Value("${app.kafka.topic.mulemind-metadata-generated-event}")
+    private String metadataGeneratedTopic;
+
     @KafkaListener(topics = "${app.kafka.topic.mulemind-metadata-generated-event}", groupId = "${spring.kafka.consumer.group-id}")
     public void onProjectUploaded(MetadataGeneratedEvent event) {
-        handleEvent(event, "mulemind-metadata-generated-event");
+        log.info("Received Kafka event from topic {}: {}", metadataGeneratedTopic, event);
+        handleEvent(event);
     }
 
-    private void handleEvent(MetadataGeneratedEvent event, String topic) {
+    private void handleEvent(MetadataGeneratedEvent event) {
         if (event == null) {
-            log.warn("Received null Kafka event from topic {}", topic);
+            log.warn("Received null Kafka event from topic {}", metadataGeneratedTopic);
             return;
         }
         // Update job status to SCANNING
-        updateJobStatus(event, TransformationStatus.SCANNING);
-
-        log.info("Received Kafka event from topic {}: {}", topic, event);
-
-       
+        updateJobStatus(event, TransformationStatus.DOCUMENT_GENERATING);
     }
 
 
