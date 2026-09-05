@@ -43,11 +43,11 @@ public class MetaDataEventConsumer {
             log.warn("Received null Kafka event from topic {}", metadataGeneratedTopic);
             return;
         }
-        updateJobStatus(event, TransformationStatus.DOCUMENT_GENERATING);
+       // updateJobStatus(event, TransformationStatus.DOCUMENT_GENERATING);
 
         try {
             String objectName = documentGenerationService.generateAndStore(event);
-            updateJobStatus(event, TransformationStatus.COMPLETED,"Documentation stored in MinIO: " + objectName);
+           //updateJobStatus(event, TransformationStatus.COMPLETED,"Documentation stored in MinIO: " + objectName);
         } catch (Exception exception) {
             log.error("Unable to generate document for {}", event.getDocumentId(), exception);
             documentGenerationService.saveFailedResult(event);

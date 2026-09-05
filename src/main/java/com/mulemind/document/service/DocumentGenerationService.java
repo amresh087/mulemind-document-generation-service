@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mulemind.document.dto.MetadataGeneratedEvent;
 import com.mulemind.document.entity.ProjectDocumentResult;
 import com.mulemind.document.repository.ProjectDocumentResultRepository;
+import com.mulemind.document.util.DocumentationType;
 
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -77,6 +78,122 @@ public class DocumentGenerationService {
     }
 
     private byte[] renderPdf(MetadataGeneratedEvent event) throws Exception {
+
+        String documentationType = event.getDocumentationType();
+        if (documentationType != null && DocumentationType.FUNCTIONAL_DOC.name().equalsIgnoreCase(documentationType)) {
+            return renderFunctionalDocPdf(event);
+        } else if (documentationType != null
+                && DocumentationType.TECHNICAL_DOC.name().equalsIgnoreCase(documentationType)) {
+            return renderTechnicalDocPdf(event);
+        } else if (documentationType != null && DocumentationType.FLOW_DOC.name().equalsIgnoreCase(documentationType)) {
+            return renderFlowDocPdf(event);
+        } else if (documentationType != null
+                && DocumentationType.SEQUENCE_DOC.name().equalsIgnoreCase(documentationType)) {
+            return renderSequenceDocPdf(event);
+        } else {
+            throw new IllegalArgumentException("Unsupported documentation type: " + documentationType);
+        }
+
+    }
+
+    /**
+     * Renders the functional documentation as a PDF.
+     * 
+     * @param event
+     * @return
+     * @throws Exception
+     */
+    public byte[] renderFunctionalDocPdf(MetadataGeneratedEvent event) throws Exception {
+
+        JsonNode documentation = objectMapper.readTree(event.getDocumentation());
+        String formattedDocumentation = objectMapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(documentation);
+
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDFont regularFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+            PDFont boldFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+            PdfWriter writer = new PdfWriter(document);
+            writer.writeLine(event.getDocumentName(), boldFont, 16);
+            writer.writeLine("Tenant: " + safe(event.getTenant()), boldFont, 11);
+            writer.writeLine("Generated: " + safe(event.getGeneratedAt()), regularFont, 10);
+            writer.writeLine("", regularFont, FONT_SIZE);
+            for (String line : formattedDocumentation.split("\\R", -1)) {
+                writer.writeWrappedLine(line, regularFont, FONT_SIZE);
+            }
+            writer.closePage();
+            document.save(output);
+            return output.toByteArray();
+        }
+    }
+
+    /**
+     * Renders the technical documentation as a PDF.
+     * 
+     * @param event
+     * @return
+     * @throws Exception
+     */
+    public byte[] renderTechnicalDocPdf(MetadataGeneratedEvent event) throws Exception {
+
+        JsonNode documentation = objectMapper.readTree(event.getDocumentation());
+        String formattedDocumentation = objectMapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(documentation);
+
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDFont regularFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+            PDFont boldFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+            PdfWriter writer = new PdfWriter(document);
+            writer.writeLine(event.getDocumentName(), boldFont, 16);
+            writer.writeLine("Tenant: " + safe(event.getTenant()), boldFont, 11);
+            writer.writeLine("Generated: " + safe(event.getGeneratedAt()), regularFont, 10);
+            writer.writeLine("", regularFont, FONT_SIZE);
+            for (String line : formattedDocumentation.split("\\R", -1)) {
+                writer.writeWrappedLine(line, regularFont, FONT_SIZE);
+            }
+            writer.closePage();
+            document.save(output);
+            return output.toByteArray();
+        }
+    }
+
+    /**
+     * Renders the flow documentation as a PDF.
+     * 
+     * @param event
+     * @return
+     * @throws Exception
+     */
+    public byte[] renderFlowDocPdf(MetadataGeneratedEvent event) throws Exception {
+
+        JsonNode documentation = objectMapper.readTree(event.getDocumentation());
+        String formattedDocumentation = objectMapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(documentation);
+
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDFont regularFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+            PDFont boldFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+            PdfWriter writer = new PdfWriter(document);
+            writer.writeLine(event.getDocumentName(), boldFont, 16);
+            writer.writeLine("Tenant: " + safe(event.getTenant()), boldFont, 11);
+            writer.writeLine("Generated: " + safe(event.getGeneratedAt()), regularFont, 10);
+            writer.writeLine("", regularFont, FONT_SIZE);
+            for (String line : formattedDocumentation.split("\\R", -1)) {
+                writer.writeWrappedLine(line, regularFont, FONT_SIZE);
+            }
+            writer.closePage();
+            document.save(output);
+            return output.toByteArray();
+        }
+    }
+
+    /**
+     * Renders the sequence documentation as a PDF.
+     * @param event
+     * @return
+     * @throws Exception
+     */
+    public byte[] renderSequenceDocPdf(MetadataGeneratedEvent event) throws Exception {
+
         JsonNode documentation = objectMapper.readTree(event.getDocumentation());
         String formattedDocumentation = objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(documentation);
