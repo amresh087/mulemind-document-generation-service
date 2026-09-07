@@ -120,7 +120,7 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         metadataCard(new String[][] {
                 { "APPLICATION NAME", value(data, "applicationName") },
                 { "BUSINESS CAPABILITY", value(data, "businessCapability") },
-                { "INTERFACES", interfaceSummary },
+                { "API'S", interfaceSummary },
                 { "ENDPOINTS", interfaces.isArray() && !interfaces.isEmpty()
                         ? "See interface specifications" : "None specified" }
         });
