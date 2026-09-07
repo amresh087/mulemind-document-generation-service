@@ -117,7 +117,7 @@ public class DocumentGenerationService {
             writer.addCover(documentation);
             writer.addBusinessFlow(documentation);
             writer.addInterface(documentation);
-            writer.addTransformation(documentation);
+           // writer.addTransformation(documentation);
             writer.addLimitations(documentation);
             writer.close();
             document.save(output);
@@ -279,7 +279,7 @@ public class DocumentGenerationService {
             y -= 34;
             text(applicationName, MARGIN, y, regularFont, 22, TEAL);
             y -= 43;
-            text("Business-oriented functional view derived exclusively from the supplied application metadata.",
+            text("A functional view that explains the application's purpose, business flow, interfaces, integrations, transformations, and error handling, derived exclusively from the evidence available in the supplied application metadata.",
                     MARGIN, y, regularFont, 11, TEXT);
             y -= 42;
 
@@ -308,7 +308,7 @@ public class DocumentGenerationService {
         private void addBusinessFlow(JsonNode data) throws Exception {
             newPage(true);
             sectionHeading("01 | Business Flow");
-            paragraph("The application flow described by the supplied data is presented below.");
+            paragraph("The following section presents the application flow derived from the supplied metadata, providing a clear view of the key functional activities and their execution sequence.");
             y -= 8;
             JsonNode flow = data.path("businessFlow");
             for (int index = 0; index < flow.size(); index++) {
@@ -324,7 +324,7 @@ public class DocumentGenerationService {
             JsonNode interfaces = data.path("interfaces");
             if (!interfaces.isArray() || interfaces.isEmpty()) {
             newPage(true);
-            sectionHeading("02 | Interface Specification");
+            sectionHeading("02 | API Specification");
             paragraph("No interfaces are specified in the supplied data.");
             finishPage();
             return;
@@ -332,14 +332,14 @@ public class DocumentGenerationService {
 
             for (int index = 0; index < interfaces.size(); index++) {
             newPage(true);
-            sectionHeading("02 | Interface Specification " + (index + 1) + " of " + interfaces.size());
+            sectionHeading("02 | API Specification " + (index + 1) + " of " + interfaces.size());
             JsonNode api = interfaces.get(index);
             filledBanner(value(api, "type") + " | " + value(api, "method") + " | " + value(api, "path")
                 + " | " + value(api, "name"));
             y -= 24;
             table(new String[][] {
-                { "Interface Type", value(api, "type") },
-                { "Interface Name", value(api, "name") },
+                { "API Type", value(api, "type") },
+                { "API Name", value(api, "name") },
                 { "Method", value(api, "method") },
                 { "Path", value(api, "path") },
                 { "Description", value(api, "description") }
@@ -399,13 +399,81 @@ public class DocumentGenerationService {
                 ? "No open questions are specified in the supplied data."
                 : firstText(data.path("openQuestions")), LIGHT_BLUE, BORDER, 45);
             y -= 32;
-            table(new String[][] {
-                    { "ERROR SCENARIOS", data.path("errorScenarios").isEmpty()
-                            ? "No error scenarios are specified in the supplied data." : value(data, "errorScenarios") },
-                    { "INTEGRATIONS", data.path("integrations").isEmpty()
-                            ? "No integrations are specified in the supplied data." : value(data, "integrations") }
-            }, new float[] { 248, 247 }, LIGHT_GREY);
+            addErrorScenarios(data.path("errorScenarios"));
+            y -= 24;
+            addIntegrations(data.path("integrations"));
             finishPage();
+        }
+
+        private void addErrorScenarios(JsonNode scenarios) throws Exception {
+            heading("Error Scenarios", 15);
+            if (!scenarios.isArray() || scenarios.isEmpty()) {
+                labelledCard(null, "No error scenarios are specified in the supplied data.", LIGHT_GREY, BORDER, 45);
+                return;
+            }
+            for (JsonNode scenario : scenarios) {
+                errorScenarioCard(scenario);
+                y -= 18;
+            }
+        }
+
+        private void addIntegrations(JsonNode integrations) throws Exception {
+            heading("Integrations", 15);
+            if (!integrations.isArray() || integrations.isEmpty()) {
+                labelledCard(null, "No integrations are specified in the supplied data.", LIGHT_GREY, BORDER, 45);
+                return;
+            }
+            for (JsonNode integration : integrations) {
+                integrationCard(integration);
+                y -= 18;
+            }
+        }
+
+        private void errorScenarioCard(JsonNode scenario) throws Exception {
+            String[][] fields = {
+                    { "CONDITION", value(scenario, "condition") },
+                    { "BEHAVIOR", value(scenario, "behavior") },
+                    { "RESPONSE", value(scenario, "response") }
+            };
+            float contentWidth = CONTENT_WIDTH - 25;
+            float height = 58;
+            for (String[] field : fields) {
+                height += wrappedHeight(field[1], contentWidth, regularFont, 10, 14) + 18;
+            }
+            rect(MARGIN, y - height, CONTENT_WIDTH, height, AMBER, new Color(239, 211, 145));
+            text(value(scenario, "scenario"), MARGIN + 16, y - 28, boldFont, 16, NAVY);
+            float fieldY = y - 65;
+            for (String[] field : fields) {
+                text(field[0], MARGIN + 16, fieldY, boldFont, 10, MUTED);
+                fieldY -= 17;
+                fieldY -= wrapped(field[1], MARGIN + 16, fieldY, contentWidth, regularFont, 10, TEXT, 14);
+                fieldY -= 17;
+            }
+            y -= height;
+        }
+
+        private void integrationCard(JsonNode integration) throws Exception {
+            String[][] fields = {
+                    { "TYPE", value(integration, "type") },
+                    { "DESCRIPTION", value(integration, "description") },
+                    { "SOURCE", value(integration, "source") },
+                    { "DESTINATION", value(integration, "destination") },
+                    { "BUSINESS PURPOSE", value(integration, "businessPurpose") }
+            };
+            float height = 58;
+            for (String[] field : fields) {
+                height += wrappedHeight(field[1], CONTENT_WIDTH - 25, regularFont, 10, 14) + 18;
+            }
+            rect(MARGIN, y - height, CONTENT_WIDTH, height, LIGHT_GREY, BORDER);
+            text(value(integration, "name"), MARGIN + 16, y - 28, boldFont, 16, NAVY);
+            float fieldY = y - 65;
+            for (String[] field : fields) {
+                text(field[0], MARGIN + 16, fieldY, boldFont, 10, MUTED);
+                fieldY -= 17;
+                fieldY -= wrapped(field[1], MARGIN + 16, fieldY, CONTENT_WIDTH - 25, regularFont, 10, TEXT, 14);
+                fieldY -= 17;
+            }
+            y -= height;
         }
 
         private void metadataCard(String[][] values) throws Exception {
