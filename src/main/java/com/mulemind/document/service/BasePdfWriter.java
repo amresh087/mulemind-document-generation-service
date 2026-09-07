@@ -3,426 +3,1123 @@ package com.mulemind.document.service;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+
 import com.fasterxml.jackson.databind.JsonNode;
 
 abstract class BasePdfWriter {
+
+    // ============================================================
+    // PAGE / LAYOUT CONSTANTS
+    // ============================================================
+
     protected static final float MARGIN = 50;
-    protected static final float CONTENT_WIDTH = PDRectangle.A4.getWidth() - (MARGIN * 2);
-    protected static final float CONTENT_RIGHT = MARGIN + CONTENT_WIDTH;
-    protected static final Color NAVY = new Color(15, 61, 102);
-    protected static final Color BLUE = new Color(23, 105, 170);
-    protected static final Color TEAL = new Color(15, 159, 168);
-    protected static final Color LIGHT_BLUE = new Color(234, 244, 251);
-    protected static final Color LIGHT_TEAL = new Color(234, 248, 248);
-    protected static final Color LIGHT_GREY = new Color(247, 249, 252);
-    protected static final Color BORDER = new Color(215, 225, 234);
-    protected static final Color TEXT = new Color(31, 41, 55);
-    protected static final Color MUTED = new Color(100, 116, 139);
-    protected static final Color AMBER = new Color(255, 248, 230);
+
+    protected static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
+    protected static final float PAGE_HEIGHT = PDRectangle.A4.getHeight();
+
+    protected static final float CONTENT_WIDTH =
+            PAGE_WIDTH - (MARGIN * 2);
+
+    protected static final float CONTENT_RIGHT =
+            MARGIN + CONTENT_WIDTH;
+
+    /*
+     * Footer safety area.
+     * Content should never go below this Y position.
+     */
+    protected static final float BOTTOM_MARGIN = 52;
+
+    /*
+     * Default page starting position.
+     */
+    protected static final float START_Y = 770;
+
+    // ============================================================
+    // VERTICAL SPACING
+    // ============================================================
+
+    /*
+     * Main section heading
+     *
+     * Example:
+     *
+     * 01 | Business Flow
+     *
+     * [space]
+     *
+     * Paragraph...
+     */
+    protected static final float SECTION_SPACE_BEFORE = 12;
+    protected static final float SECTION_SPACE_AFTER = 28;
+
+    /*
+     * Normal subsection heading
+     */
+    protected static final float HEADING_SPACE_BEFORE = 8;
+    protected static final float HEADING_SPACE_AFTER = 22;
+
+    /*
+     * Paragraph spacing
+     */
+    protected static final float PARAGRAPH_SPACE_BEFORE = 4;
+    protected static final float PARAGRAPH_SPACE_AFTER = 10;
+
+    /*
+     * Space between cards / tables / blocks.
+     */
+    protected static final float BLOCK_SPACE = 14;
+
+    /*
+     * Space after banner.
+     */
+    protected static final float BANNER_SPACE_AFTER = 16;
+
+    // ============================================================
+    // COLORS
+    // ============================================================
+
+    protected static final Color NAVY =
+            new Color(15, 61, 102);
+
+    protected static final Color BLUE =
+            new Color(23, 105, 170);
+
+    protected static final Color TEAL =
+            new Color(15, 159, 168);
+
+    protected static final Color LIGHT_BLUE =
+            new Color(234, 244, 251);
+
+    protected static final Color LIGHT_TEAL =
+            new Color(234, 248, 248);
+
+    protected static final Color LIGHT_GREY =
+            new Color(247, 249, 252);
+
+    protected static final Color BORDER =
+            new Color(215, 225, 234);
+
+    protected static final Color TEXT =
+            new Color(31, 41, 55);
+
+    protected static final Color MUTED =
+            new Color(100, 116, 139);
+
+    protected static final Color AMBER =
+            new Color(255, 248, 230);
+
+    // ============================================================
+    // PDF STATE
+    // ============================================================
 
     protected final PDDocument document;
+
     protected final PDFont regularFont;
+
     protected final PDFont boldFont;
+
     protected final String applicationName;
+
     private PDPageContentStream stream;
+
     private float y;
 
-    /**
-     * Constructor for the BasePdfWriter class.
-     * @param document
-     * @param regularFont
-     * @param boldFont
-     * @param applicationName
-     */
-    protected BasePdfWriter(PDDocument document, PDFont regularFont, PDFont boldFont, String applicationName) {
+    // ============================================================
+    // CONSTRUCTOR
+    // ============================================================
+
+    protected BasePdfWriter(
+            PDDocument document,
+            PDFont regularFont,
+            PDFont boldFont,
+            String applicationName) {
+
         this.document = document;
         this.regularFont = regularFont;
         this.boldFont = boldFont;
         this.applicationName = applicationName;
     }
 
+    // ============================================================
+    // Y POSITION
+    // ============================================================
+
     /**
-     * Retrieves the current Y-coordinate for content placement in the PDF.
-     * @return The current Y-coordinate.
+     * Returns the current Y position.
      */
     protected final float currentY() {
         return y;
     }
 
     /**
-     * Moves the Y-coordinate for content placement in the PDF.
-     * @param value The value to move the Y-coordinate by.
+     * Moves the current Y position by the supplied value.
+     *
+     * Example:
+     * moveY(-10) -> moves down 10 points.
      */
     protected final void moveY(float value) {
         y = value;
     }
 
     /**
-     * Sets the current Y-coordinate for content placement in the PDF.
-     * @param value The value to set the Y-coordinate to.
+     * Sets the current Y position.
      */
     protected final void setCurrentY(float value) {
         y = value;
     }
 
+    // ============================================================
+    // SECTION HEADING
+    // ============================================================
+
     /**
-     * Creates a section heading in the PDF.
-     * @param title The title of the section heading.
-     * @throws Exception If an error occurs while creating the heading.
+     * Creates a main section heading.
+     *
+     * Example:
+     *
+     * 01 | Business Flow
+     *
+     * [28pt]
+     *
+     * Paragraph...
      */
     protected void sectionHeading(String title) throws Exception {
-        text(title, MARGIN, y, boldFont, 20, NAVY);
-        y -= 34;
+
+        /*
+         * Reserve enough space for:
+         * - space before heading
+         * - heading itself
+         * - space after heading
+         */
+        ensureSpace(
+                SECTION_SPACE_BEFORE
+                        + 20
+                        + SECTION_SPACE_AFTER
+        );
+
+        // Space before heading
+        y -= SECTION_SPACE_BEFORE;
+
+        // Heading
+        text(
+                title,
+                MARGIN,
+                y,
+                boldFont,
+                20,
+                NAVY
+        );
+
+        // Space after heading
+        y -= SECTION_SPACE_AFTER;
     }
 
+    // ============================================================
+    // NORMAL HEADING
+    // ============================================================
+
     /**
-     * Creates a heading in the PDF with the specified title and size.
-     * @param title
-     * @param size
-     * @throws Exception
+     * Creates a normal subsection heading.
      */
     protected void heading(String title, float size) throws Exception {
-        text(title, MARGIN, y, boldFont, size, BLUE);
-        y -= size + 9;
+
+        ensureSpace(
+                HEADING_SPACE_BEFORE
+                        + size
+                        + HEADING_SPACE_AFTER
+        );
+
+        // Space before heading
+        y -= HEADING_SPACE_BEFORE;
+
+        // Heading
+        text(
+                title,
+                MARGIN,
+                y,
+                boldFont,
+                size,
+                BLUE
+        );
+
+        // Space after heading
+        y -= HEADING_SPACE_AFTER;
     }
 
+    // ============================================================
+    // PARAGRAPH
+    // ============================================================
 
     /**
-     * Creates a paragraph in the PDF with the specified value.
-     * @param value The value to display in the paragraph.
-     * @throws Exception If an error occurs while creating the paragraph.
+     * Creates a wrapped paragraph with consistent spacing.
      */
     protected void paragraph(String value) throws Exception {
-        for (String line : wrap(value, regularFont, 10, CONTENT_WIDTH)) {
+
+        if (value == null || value.isBlank()) {
+            return;
+        }
+
+        List<String> lines =
+                wrap(
+                        value,
+                        regularFont,
+                        10,
+                        CONTENT_WIDTH
+                );
+
+        /*
+         * Space before paragraph.
+         */
+        y -= PARAGRAPH_SPACE_BEFORE;
+
+        for (String line : lines) {
+
             ensureSpace(14);
-            text(line, MARGIN, y, regularFont, 10, TEXT);
+
+            text(
+                    line,
+                    MARGIN,
+                    y,
+                    regularFont,
+                    10,
+                    TEXT
+            );
+
             y -= 14;
         }
+
+        /*
+         * Space after paragraph.
+         */
+        y -= PARAGRAPH_SPACE_AFTER;
     }
 
-    /**
-     * Creates a filled banner in the PDF with the specified value.
-     * @param value The value to display in the banner.
-     * @throws Exception If an error occurs while creating the banner.
-     */
+    // ============================================================
+    // FILLED BANNER
+    // ============================================================
+
     protected void filledBanner(String value) throws Exception {
-        ensureSpace(54);
-        rect(MARGIN, y - 54, CONTENT_WIDTH, 54, NAVY, NAVY);
-        centered(value, MARGIN + CONTENT_WIDTH / 2, y - 31, boldFont, 12, Color.WHITE);
-        y -= 54;
-    }
 
-    /**
-     * Creates a labelled card in the PDF with the specified label, value, and colors.
-     * @param label The label for the card.
-     * @param value The value to display in the card.
-     * @param fill The fill color for the card.
-     * @param border The border color for the card.
-     * @param minHeight The minimum height for the card.
-     * @throws Exception If an error occurs while creating the card.
-     */
-    protected void labelledCard(String label, String value, Color fill, Color border, float minHeight) throws Exception {
-        float labelWidth = label == null ? 0 : 135;
-        float height = Math.max(minHeight, wrappedHeight(value, CONTENT_WIDTH - labelWidth - 25, regularFont, 10, 14) + 24);
-        ensureSpace(height);
-        rect(MARGIN, y - height, CONTENT_WIDTH, height, fill, border);
-        if (label != null) {
-            rect(MARGIN, y - height, labelWidth, height, fill, fill);
-            text(label, MARGIN + 10, y - 22, boldFont, 10, TEXT);
-        }
-        wrapped(value, MARGIN + labelWidth + 15, y - 22, CONTENT_WIDTH - labelWidth - 25, regularFont, 10, TEXT, 14);
+        final float height = 54;
+
+        ensureSpace(
+                height
+                        + BANNER_SPACE_AFTER
+        );
+
+        rect(
+                MARGIN,
+                y - height,
+                CONTENT_WIDTH,
+                height,
+                NAVY,
+                NAVY
+        );
+
+        centered(
+                value,
+                MARGIN + CONTENT_WIDTH / 2,
+                y - 31,
+                boldFont,
+                12,
+                Color.WHITE
+        );
+
         y -= height;
+
+        /*
+         * Space after banner.
+         */
+        y -= BANNER_SPACE_AFTER;
     }
 
-    /**
-     * Creates a purpose card in the PDF with the specified value.
-     * @param value The value to display in the purpose card.
-     * @throws Exception If an error occurs while creating the card.
-     */
+    // ============================================================
+    // LABELLED CARD
+    // ============================================================
+
+    protected void labelledCard(
+            String label,
+            String value,
+            Color fill,
+            Color border,
+            float minHeight) throws Exception {
+
+        float labelWidth =
+                label == null ? 0 : 135;
+
+        float contentWidth =
+                CONTENT_WIDTH
+                        - labelWidth
+                        - 25;
+
+        float contentHeight =
+                wrappedHeight(
+                        value,
+                        contentWidth,
+                        regularFont,
+                        10,
+                        14
+                );
+
+        float height =
+                Math.max(
+                        minHeight,
+                        contentHeight + 36
+                );
+
+        /*
+         * Add space between blocks.
+         */
+        ensureSpace(
+                height
+                        + BLOCK_SPACE
+        );
+
+        rect(
+                MARGIN,
+                y - height,
+                CONTENT_WIDTH,
+                height,
+                fill,
+                border
+        );
+
+        // Label section
+        if (label != null) {
+
+            rect(
+                    MARGIN,
+                    y - height,
+                    labelWidth,
+                    height,
+                    fill,
+                    fill
+            );
+
+            text(
+                    label,
+                    MARGIN + 10,
+                    y - 22,
+                    boldFont,
+                    10,
+                    TEXT
+            );
+        }
+
+        // Card content
+        wrapped(
+                value,
+                MARGIN + labelWidth + 15,
+                y - 22,
+                contentWidth,
+                regularFont,
+                10,
+                TEXT,
+                14
+        );
+
+        /*
+         * Move below card.
+         */
+        y -= height;
+
+        /*
+         * Consistent gap after card.
+         */
+        y -= BLOCK_SPACE;
+    }
+
+    // ============================================================
+    // PURPOSE CARD
+    // ============================================================
 
     protected void purposeCard(String value) throws Exception {
-        float height = Math.max(82, wrappedHeight(value, CONTENT_WIDTH - 20, regularFont, 10, 14) + 52);
-        ensureSpace(height);
-        rect(MARGIN, y - height, CONTENT_WIDTH, height, LIGHT_BLUE, BORDER);
-        text("PURPOSE", MARGIN + 10, y - 22, boldFont, 10, TEXT);
-        wrapped(value, MARGIN + 10, y - 50, CONTENT_WIDTH - 20, regularFont, 10, TEXT, 14);
+
+        float height =
+                Math.max(
+                        82,
+                        wrappedHeight(
+                                value,
+                                CONTENT_WIDTH - 20,
+                                regularFont,
+                                10,
+                                14
+                        ) + 58
+                );
+
+        ensureSpace(
+                height
+                        + BLOCK_SPACE
+        );
+
+        rect(
+                MARGIN,
+                y - height,
+                CONTENT_WIDTH,
+                height,
+                LIGHT_BLUE,
+                BORDER
+        );
+
+        // Label
+        text(
+                "PURPOSE",
+                MARGIN + 10,
+                y - 22,
+                boldFont,
+                10,
+                TEXT
+        );
+
+        // Content
+        wrapped(
+                value,
+                MARGIN + 10,
+                y - 50,
+                CONTENT_WIDTH - 20,
+                regularFont,
+                10,
+                TEXT,
+                14
+        );
+
         y -= height;
+
+        /*
+         * Space after purpose card.
+         */
+        y -= BLOCK_SPACE;
     }
 
-    /**
-     * Creates a table in the PDF with the specified rows, column widths, and fill color.
-     * @param rows The rows of the table.
-     * @param widths The widths of the columns.
-     * @param fill The fill color for the table cells.
-     * @throws Exception If an error occurs while creating the table.
-     */
+    // ============================================================
+    // TABLE
+    // ============================================================
 
-    protected void table(String[][] rows, float[] widths, Color fill) throws Exception {
+    protected void table(
+            String[][] rows,
+            float[] widths,
+            Color fill) throws Exception {
+
+        if (rows == null || rows.length == 0) {
+            return;
+        }
+
         for (String[] row : rows) {
-            float height = rowHeight(row, widths, regularFont, 10);
-            ensureSpace(height);
-            float x = MARGIN;
-            for (int index = 0; index < row.length; index++) {
-                rect(x, y - height, widths[index], height, fill, BORDER);
-                wrapped(row[index], x + 10, y - 18, widths[index] - 20, index == 0 ? boldFont : regularFont,
-                        10, TEXT, 14);
-                x += widths[index];
+
+            if (row == null) {
+                continue;
             }
+
+            float height =
+                    rowHeight(
+                            row,
+                            widths,
+                            regularFont,
+                            10
+                    );
+
+            ensureSpace(height);
+
+            float x = MARGIN;
+
+            for (int index = 0;
+                 index < row.length;
+                 index++) {
+
+                float width = widths[index];
+
+                rect(
+                        x,
+                        y - height,
+                        width,
+                        height,
+                        fill,
+                        BORDER
+                );
+
+                PDFont font =
+                        index == 0
+                                ? boldFont
+                                : regularFont;
+
+                wrapped(
+                        row[index],
+                        x + 10,
+                        y - 18,
+                        width - 20,
+                        font,
+                        10,
+                        TEXT,
+                        14
+                );
+
+                x += width;
+            }
+
             y -= height;
+        }
+
+        /*
+         * Small gap after complete table.
+         */
+        y -= BLOCK_SPACE;
+    }
+
+    // ============================================================
+    // TABLE WITH HEADER
+    // ============================================================
+
+    protected void tableWithHeader(
+            String[] headers,
+            List<String[]> rows,
+            float[] widths,
+            Color fill) throws Exception {
+
+        if (headers != null) {
+
+            table(
+                    new String[][]{
+                            headers
+                    },
+                    widths,
+                    fill
+            );
+        }
+
+        if (rows != null) {
+
+            for (String[] row : rows) {
+
+                table(
+                        new String[][]{
+                                row
+                        },
+                        widths,
+                        Color.WHITE
+                );
+            }
         }
     }
 
-    /**
-     * Creates a table with a header in the PDF with the specified headers, rows, column widths, and fill color.
-     * @param headers The headers for the table.
-     * @param rows The rows of the table.
-     * @param widths The widths of the columns.
-     * @param fill The fill color for the table cells.
-     * @throws Exception If an error occurs while creating the table.
-     */
-    protected void tableWithHeader(String[] headers, List<String[]> rows, float[] widths, Color fill) throws Exception {
-        table(new String[][] { headers }, widths, fill);
-        for (String[] row : rows) table(new String[][] { row }, widths, Color.WHITE);
-    }
+    // ============================================================
+    // TABLE ROW HEIGHT
+    // ============================================================
 
-    /**
-     * Calculates the height of a row in the table based on the content and column widths.
-     * @param row The row of data.
-     * @param widths The widths of the columns.
-     * @param font The font used for the text.
-     * @param size The font size.
-     * @return The calculated height of the row.
-     * @throws Exception If an error occurs while calculating the height.
-     */
+    protected float rowHeight(
+            String[] row,
+            float[] widths,
+            PDFont font,
+            float size) throws Exception {
 
-    protected float rowHeight(String[] row, float[] widths, PDFont font, float size) throws Exception {
-        float height = 28;
-        for (int index = 0; index < row.length; index++) height = Math.max(height,
-                wrappedHeight(row[index], widths[index] - 20, font, size, 14) + 18);
+        float height = 30;
+
+        for (int index = 0;
+             index < row.length;
+             index++) {
+
+            String value =
+                    row[index] == null
+                            ? ""
+                            : row[index];
+
+            float textHeight =
+                    wrappedHeight(
+                            value,
+                            widths[index] - 20,
+                            font,
+                            size,
+                            14
+                    );
+
+            height =
+                    Math.max(
+                            height,
+                            textHeight + 20
+                    );
+        }
+
         return height;
     }
 
-    /**
-     * Wraps the text to fit within the specified width and draws it on the PDF.
-     * @param value The text to wrap and draw.
-     * @param x The x-coordinate for the text placement.
-     * @param top The y-coordinate for the top of the text.
-     * @param width The maximum width for the text.
-     * @param font The font used for the text.
-     * @param size The font size.
-     * @param color The color of the text.
-     * @param lineHeight The height of each line of text.
-     * @return The total height of the wrapped text.
-     * @throws Exception If an error occurs while wrapping or drawing the text.
-     */
-    protected float wrapped(String value, float x, float top, float width, PDFont font, float size,
-            Color color, float lineHeight) throws Exception {
-        List<String> lines = wrap(value, font, size, width);
+    // ============================================================
+    // WRAPPED TEXT
+    // ============================================================
+
+    protected float wrapped(
+            String value,
+            float x,
+            float top,
+            float width,
+            PDFont font,
+            float size,
+            Color color,
+            float lineHeight) throws Exception {
+
+        List<String> lines =
+                wrap(
+                        value,
+                        font,
+                        size,
+                        width
+                );
+
         for (String line : lines) {
-            text(line, x, top, font, size, color);
+
+            text(
+                    line,
+                    x,
+                    top,
+                    font,
+                    size,
+                    color
+            );
+
             top -= lineHeight;
         }
+
         return lines.size() * lineHeight;
     }
 
-    /**
-     * Calculates the height of wrapped text based on the specified width, font, size, and line height.
-     * @param value The text to calculate the height for.
-     * @param width The maximum width for the text.
-     * @param font The font used for the text.
-     * @param size The font size.
-     * @param lineHeight The height of each line of text.
-     * @return The total height of the wrapped text.
-     * @throws Exception If an error occurs while calculating the height.
-     */
-    protected float wrappedHeight(String value, float width, PDFont font, float size, float lineHeight) throws Exception {
-        return wrap(value, font, size, width).size() * lineHeight;
+    // ============================================================
+    // WRAPPED HEIGHT
+    // ============================================================
+
+    protected float wrappedHeight(
+            String value,
+            float width,
+            PDFont font,
+            float size,
+            float lineHeight) throws Exception {
+
+        return wrap(
+                value,
+                font,
+                size,
+                width
+        ).size() * lineHeight;
     }
 
-    /**
-     * Wraps the text into lines that fit within the specified width based on the font and size.
-     * @param value The text to wrap.
-     * @param font The font used for the text.
-     * @param size The font size.
-     * @param width The maximum width for the text.
-     * @return A list of wrapped lines of text.
-     * @throws Exception If an error occurs while wrapping the text.
-     */
-    protected List<String> wrap(String value, PDFont font, float size, float width) throws Exception {
-        List<String> lines = new ArrayList<>();
-        String safeValue = value == null ? "" : value;
-        for (String paragraph : safeValue.split("\\R", -1)) {
+    // ============================================================
+    // TEXT WRAPPING
+    // ============================================================
+
+    protected List<String> wrap(
+            String value,
+            PDFont font,
+            float size,
+            float width) throws Exception {
+
+        List<String> lines =
+                new ArrayList<>();
+
+        String safeValue =
+                value == null
+                        ? ""
+                        : value;
+
+        for (String paragraph :
+                safeValue.split("\\R", -1)) {
+
             String remaining = paragraph;
+
             if (remaining.isEmpty()) {
+
                 lines.add("");
+
                 continue;
             }
+
             while (!remaining.isEmpty()) {
-                int split = remaining.length();
-                while (split > 0 && font.getStringWidth(remaining.substring(0, split)) / 1000 * size > width) split--;
-                if (split < remaining.length()) {
-                    int space = remaining.lastIndexOf(' ', split);
-                    if (space > 0) split = space;
+
+                int split =
+                        remaining.length();
+
+                /*
+                 * Reduce the string until it fits
+                 * within the available width.
+                 */
+                while (
+                        split > 0
+                                && font.getStringWidth(
+                                        remaining.substring(
+                                                0,
+                                                split
+                                        )
+                                ) / 1000 * size > width
+                ) {
+
+                    split--;
                 }
-                if (split == 0) split = 1;
-                lines.add(remaining.substring(0, split).trim());
-                remaining = remaining.substring(split).trim();
+
+                /*
+                 * Prefer breaking at a space.
+                 */
+                if (split < remaining.length()) {
+
+                    int space =
+                            remaining.lastIndexOf(
+                                    ' ',
+                                    split
+                            );
+
+                    if (space > 0) {
+                        split = space;
+                    }
+                }
+
+                /*
+                 * Protect against an infinite loop
+                 * for extremely long words.
+                 */
+                if (split == 0) {
+                    split = 1;
+                }
+
+                String line =
+                        remaining
+                                .substring(0, split)
+                                .trim();
+
+                lines.add(line);
+
+                remaining =
+                        remaining
+                                .substring(split)
+                                .trim();
             }
         }
-        return lines.isEmpty() ? List.of("") : lines;
+
+        return lines.isEmpty()
+                ? List.of("")
+                : lines;
     }
 
-    /**
-     * Creates a new page in the PDF, optionally with a header.
-     * @param withHeader Whether to include a header on the new page.
-     * @throws Exception If an error occurs while creating the new page.
-     */
+    // ============================================================
+    // NEW PAGE
+    // ============================================================
+
     protected void newPage(boolean withHeader) throws Exception {
+
+        /*
+         * Close the previous page first.
+         */
         finishPage();
-        PDPage page = new PDPage(PDRectangle.A4);
+
+        PDPage page =
+                new PDPage(
+                        PDRectangle.A4
+                );
+
         document.addPage(page);
-        stream = new PDPageContentStream(document, page);
-        y = 770;
+
+        stream =
+                new PDPageContentStream(
+                        document,
+                        page
+                );
+
+        /*
+         * Start content below header.
+         */
+        y = START_Y;
+
         if (withHeader) {
-            rect(0, 819, PDRectangle.A4.getWidth(), 23, NAVY, NAVY);
+
+            /*
+             * Header bar.
+             */
+            rect(
+                    0,
+                    PAGE_HEIGHT - 23,
+                    PAGE_WIDTH,
+                    23,
+                    NAVY,
+                    NAVY
+            );
+
+            /*
+             * Slight additional gap after header.
+             */
+            y = START_Y;
         }
     }
 
-    /**
-     * Ensures that there is enough space on the current page for content of the specified height.
-     * If there is not enough space, a new page is created.
-     * @param height The height of the content to be added.
-     * @throws Exception If an error occurs while ensuring space or creating a new page.
-     */
+    // ============================================================
+    // ENSURE SPACE
+    // ============================================================
+
     protected void ensureSpace(float height) throws Exception {
-        if (stream != null && y - height < 52) newPage(true);
-    }
 
-    /**
-     * Finishes the current page in the PDF by adding a footer and closing the content stream.
-     * @throws Exception If an error occurs while finishing the page.
-     */
-    protected void finishPage() throws Exception {
-        if (stream != null) {
-            text(applicationName + " | Functional Documentation", MARGIN, 28, regularFont, 8, MUTED);
-            text(Integer.toString(document.getNumberOfPages()), CONTENT_RIGHT - 8, 28, regularFont, 8, MUTED);
-            stream.close();
-            stream = null;
+        if (stream == null) {
+            return;
+        }
+
+        /*
+         * Do not allow content to enter the footer area.
+         */
+        if (y - height < BOTTOM_MARGIN) {
+
+            newPage(true);
         }
     }
 
-    /**
-     * Closes the PDF writer by finishing the current page.
-     * @throws Exception If an error occurs while closing the writer.
-     */
+    // ============================================================
+    // FINISH PAGE
+    // ============================================================
+
+    protected void finishPage() throws Exception {
+
+        if (stream == null) {
+            return;
+        }
+
+        /*
+         * Footer left.
+         */
+        text(
+                applicationName
+                        + " | Functional Documentation",
+                MARGIN,
+                28,
+                regularFont,
+                8,
+                MUTED
+        );
+
+        /*
+         * Footer page number.
+         */
+        String pageNumber =
+                Integer.toString(
+                        document.getNumberOfPages()
+                );
+
+        text(
+                pageNumber,
+                CONTENT_RIGHT - 8,
+                28,
+                regularFont,
+                8,
+                MUTED
+        );
+
+        stream.close();
+
+        stream = null;
+    }
+
+    // ============================================================
+    // CLOSE
+    // ============================================================
+
     protected void close() throws Exception {
+
         finishPage();
     }
 
-    /**
-     * Draws text on the PDF at the specified coordinates with the given font, size, and color.
-     * @param value The text to draw.
-     * @param x The x-coordinate for the text placement.
-     * @param baseline The y-coordinate for the baseline of the text.
-     * @param font The font used for the text.
-     * @param size The font size.
-     * @param color The color of the text.
-     * @throws Exception If an error occurs while drawing the text.
-     */
-    protected void text(String value, float x, float baseline, PDFont font, float size, Color color) throws Exception {
+    // ============================================================
+    // DRAW TEXT
+    // ============================================================
+
+    protected void text(
+            String value,
+            float x,
+            float baseline,
+            PDFont font,
+            float size,
+            Color color) throws Exception {
+
         stream.beginText();
-        stream.setFont(font, size);
-        stream.setNonStrokingColor(color);
-        stream.newLineAtOffset(x, baseline);
-        stream.showText(sanitize(value));
+
+        stream.setFont(
+                font,
+                size
+        );
+
+        stream.setNonStrokingColor(
+                color
+        );
+
+        stream.newLineAtOffset(
+                x,
+                baseline
+        );
+
+        stream.showText(
+                sanitize(value)
+        );
+
         stream.endText();
     }
 
-    /**
-     * Draws centered text on the PDF at the specified coordinates with the given font, size, and color.
-     * @param value The text to draw.
-     * @param centerX The x-coordinate for the center of the text.
-     * @param baseline The y-coordinate for the baseline of the text.
-     * @param font The font used for the text.
-     * @param size The font size.
-     * @param color The color of the text.
-     * @throws Exception If an error occurs while drawing the text.
-     */
-    protected void centered(String value, float centerX, float baseline, PDFont font, float size, Color color) throws Exception {
-        float width = font.getStringWidth(sanitize(value)) / 1000 * size;
-        text(value, centerX - width / 2, baseline, font, size, color);
+    // ============================================================
+    // CENTERED TEXT
+    // ============================================================
+
+    protected void centered(
+            String value,
+            float centerX,
+            float baseline,
+            PDFont font,
+            float size,
+            Color color) throws Exception {
+
+        String safeValue =
+                sanitize(value);
+
+        float width =
+                font.getStringWidth(
+                        safeValue
+                ) / 1000 * size;
+
+        text(
+                safeValue,
+                centerX - width / 2,
+                baseline,
+                font,
+                size,
+                color
+        );
     }
 
-    /**
-     * Draws a rectangle on the PDF at the specified coordinates with the given fill and border colors.
-     * @param x The x-coordinate for the rectangle.
-     * @param bottom The y-coordinate for the bottom of the rectangle.
-     * @param width The width of the rectangle.
-     * @param height The height of the rectangle.
-     * @param fill The fill color of the rectangle.
-     * @param border The border color of the rectangle.
-     * @throws Exception If an error occurs while drawing the rectangle.
-     */
-    protected void rect(float x, float bottom, float width, float height, Color fill, Color border) throws Exception {
-        stream.setNonStrokingColor(fill);
-        stream.addRect(x, bottom, width, height);
+    // ============================================================
+    // RECTANGLE
+    // ============================================================
+
+    protected void rect(
+            float x,
+            float bottom,
+            float width,
+            float height,
+            Color fill,
+            Color border) throws Exception {
+
+        /*
+         * Fill.
+         */
+        stream.setNonStrokingColor(
+                fill
+        );
+
+        stream.addRect(
+                x,
+                bottom,
+                width,
+                height
+        );
+
         stream.fill();
-        stream.setStrokingColor(border);
-        stream.setLineWidth(0.7f);
-        stream.addRect(x, bottom, width, height);
+
+        /*
+         * Border.
+         */
+        stream.setStrokingColor(
+                border
+        );
+
+        stream.setLineWidth(
+                0.7f
+        );
+
+        stream.addRect(
+                x,
+                bottom,
+                width,
+                height
+        );
+
         stream.stroke();
     }
 
-    /**
-     * Draws a line on the PDF from the specified start coordinates to the end coordinates with the given color and width.
-     * @param x1 The x-coordinate for the start of the line.
-     * @param y1 The y-coordinate for the start of the line.
-     * @param x2 The x-coordinate for the end of the line.
-     * @param y2 The y-coordinate for the end of the line.
-     * @param color The color of the line.
-     * @param width The width of the line.
-     * @throws Exception If an error occurs while drawing the line.
-     */
-    protected void line(float x1, float y1, float x2, float y2, Color color, float width) throws Exception {
-        stream.setStrokingColor(color);
-        stream.setLineWidth(width);
-        stream.moveTo(x1, y1);
-        stream.lineTo(x2, y2);
+    // ============================================================
+    // LINE
+    // ============================================================
+
+    protected void line(
+            float x1,
+            float y1,
+            float x2,
+            float y2,
+            Color color,
+            float width) throws Exception {
+
+        stream.setStrokingColor(
+                color
+        );
+
+        stream.setLineWidth(
+                width
+        );
+
+        stream.moveTo(
+                x1,
+                y1
+        );
+
+        stream.lineTo(
+                x2,
+                y2
+        );
+
         stream.stroke();
     }
 
-    /**
-     * Retrieves the first text value from a JsonNode array.
-     * @param array The JsonNode array to retrieve the value from.
-     * @return The first text value in the array, or an empty string if the array is empty or not an array.
-     */
-    protected static String firstText(JsonNode array) {
-        return array.isArray() && !array.isEmpty() ? array.get(0).asText() : "";
+    // ============================================================
+    // FIRST TEXT
+    // ============================================================
+
+    protected static String firstText(
+            JsonNode array) {
+
+        return array != null
+                && array.isArray()
+                && !array.isEmpty()
+                ? array.get(0).asText()
+                : "";
     }
 
-    /**
-     * Retrieves the value of a specified field from a JsonNode.
-     * @param node The JsonNode to retrieve the value from.
-     * @param field The name of the field to retrieve.
-     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
-     */
-    protected static String value(JsonNode node, String field) {
-        JsonNode value = node == null ? null : node.get(field);
-        if (value == null || value.isNull()) return "";
-        return value.isValueNode() ? value.asText() : value.toString();
+    // ============================================================
+    // JSON VALUE
+    // ============================================================
+
+    protected static String value(
+            JsonNode node,
+            String field) {
+
+        JsonNode value =
+                node == null
+                        ? null
+                        : node.get(field);
+
+        if (value == null || value.isNull()) {
+            return "";
+        }
+
+        return value.isValueNode()
+                ? value.asText()
+                : value.toString();
     }
 
-    /**
-     * Sanitizes a string value by replacing certain characters and removing non-ASCII characters.
-     * @param value The string value to sanitize.
-     * @return The sanitized string value.
-     */
-    protected static String sanitize(String value) {
-        return value == null ? "" : value.replace("→", "->").replaceAll("[^\\x00-\\x7F]", "?");
+    // ============================================================
+    // SANITIZE
+    // ============================================================
+
+    protected static String sanitize(
+            String value) {
+
+        return value == null
+                ? ""
+                : value
+                        .replace("→", "->")
+                        .replaceAll(
+                                "[^\\x00-\\x7F]",
+                                "?"
+                        );
     }
 }
