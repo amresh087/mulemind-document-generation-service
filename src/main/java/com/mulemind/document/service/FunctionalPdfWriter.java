@@ -107,12 +107,16 @@ public class FunctionalPdfWriter extends BasePdfWriter {
      */
     private void addCover(JsonNode data) throws Exception {
         newPage(false);
-        text("FUNCTIONAL DOCUMENT", MARGIN, 690, boldFont, 31, NAVY);
-        text(value(data, "applicationName"), MARGIN, 656, regularFont, 22, TEAL);
-        float y = 613;
-        y -= wrapped("A functional view that explains the application's purpose, business flow, interfaces, integrations, transformations, and error handling, derived exclusively from the evidence available in the supplied application metadata.",
-                MARGIN, y, CONTENT_WIDTH, regularFont, 11, TEXT, 15);
-        y -= 27;
+        setCurrentY(700);
+
+        text("FUNCTIONAL DOCUMENT", MARGIN, currentY(), boldFont, 31, NAVY);
+        setCurrentY(currentY() - 42);
+        text(value(data, "applicationName"), MARGIN, currentY(), regularFont, 22, TEAL);
+        setCurrentY(currentY() - 32);
+        setCurrentY(currentY() - wrapped("A functional view that explains the application's purpose, business flow, interfaces, integrations, transformations, and error handling, derived exclusively from the evidence available in the supplied application metadata.",
+                MARGIN, currentY(), CONTENT_WIDTH, regularFont, 11, TEXT, 15));
+        setCurrentY(currentY() - 27);
+
         JsonNode interfacesJson = data.path("interfaces");
         String interfaceSummary = interfacesJson.isArray()
                 ? interfacesJson.size() + (interfacesJson.size() == 1 ? " API" : " APIs")
