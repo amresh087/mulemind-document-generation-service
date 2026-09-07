@@ -123,8 +123,9 @@ public class DocumentGenerationService {
             writer.addCover(documentation);
             writer.addBusinessFlow(documentation);
             writer.addInterface(documentation);
-           // writer.addTransformation(documentation);
             writer.addLimitations(documentation);
+            writer.addErrorScenariosSection(documentation);
+            writer.addIntegrationsSection(documentation);
             writer.close();
             document.save(output);
             return output.toByteArray();
@@ -327,7 +328,8 @@ public class DocumentGenerationService {
             heading("DOCUMENT MAP", 15);
             table(new String[][] {
                     { "01", "Business Flow", "02", "Interface" },
-                    { "03", "Data Transformation", "04", "Limitations & Open Question" }
+                    { "03", "Limitations & Open Question", "04", "Error Scenarios" },
+                    { "05", "Integrations", "", "" }
                 }, new float[] { 38, 209.5f, 38, 209.5f }, LIGHT_GREY);
             finishPage();
         }
@@ -378,6 +380,7 @@ public class DocumentGenerationService {
             y -= 22;
             heading("Processing", 14);
             paragraph(value(api, "processing"));
+            addTransformationDetails(data.path("dataTransformations"));
             y -= 15;
             heading("Output", 14);
             tableWithHeader(new String[] { "Field", "Destination" }, outputRows(api.path("outputs")),
@@ -389,34 +392,21 @@ public class DocumentGenerationService {
             }
         }
 
-        private void addTransformation(JsonNode data) throws Exception {
-            newPage(true);
-            sectionHeading("03 | Data Transformation");
-            if (!data.path("dataTransformations").isArray() || data.path("dataTransformations").isEmpty()) {
-                paragraph("No data transformation details are specified in the supplied data.");
-                finishPage();
+        private void addTransformationDetails(JsonNode transformations) throws Exception {
+            if (!transformations.isArray() || transformations.isEmpty()) {
                 return;
             }
-            JsonNode transformation = first(data.path("dataTransformations"));
-            paragraph(value(transformation, "description"));
-            y -= 22;
-            transformationCards(value(transformation, "input"), value(transformation, "output"));
-            y -= 28;
-            heading("Transformation Details", 14);
-            table(new String[][] {
-                    { "Input", value(transformation, "input") },
-                    { "Output", value(transformation, "output") },
-                    { "Rule", value(transformation, "description") },
-                    { "Rules", transformation.path("rules").isArray() && transformation.path("rules").isEmpty()
-                            ? "No transformation rules are specified in the supplied data."
-                            : value(transformation, "rules") }
-            }, new float[] { 135, 360 }, LIGHT_GREY);
-            finishPage();
+            for (JsonNode transformation : transformations) {
+                String description = value(transformation, "description");
+                if (!description.isBlank()) {
+                    paragraph(description);
+                }
+            }
         }
 
         private void addLimitations(JsonNode data) throws Exception {
             newPage(true);
-            sectionHeading("04 | Limitations & Open Question");
+            sectionHeading("03 | Limitations & Open Question");
             labelledCard("KNOWN LIMITATION", data.path("knownLimitations").isEmpty()
                 ? "No known limitations are specified in the supplied data."
                 : firstText(data.path("knownLimitations")), AMBER,
@@ -425,9 +415,19 @@ public class DocumentGenerationService {
             labelledCard("OPEN QUESTION", data.path("openQuestions").isEmpty()
                 ? "No open questions are specified in the supplied data."
                 : firstText(data.path("openQuestions")), LIGHT_BLUE, BORDER, 45);
-            y -= 32;
+            finishPage();
+        }
+
+        private void addErrorScenariosSection(JsonNode data) throws Exception {
+            newPage(true);
+            sectionHeading("04 | Error Scenarios");
             addErrorScenarios(data.path("errorScenarios"));
-            y -= 24;
+            finishPage();
+        }
+
+        private void addIntegrationsSection(JsonNode data) throws Exception {
+            newPage(true);
+            sectionHeading("05 | Integrations");
             addIntegrations(data.path("integrations"));
             finishPage();
         }
@@ -552,26 +552,6 @@ public class DocumentGenerationService {
                 x += widths[index];
             }
             y -= 105;
-        }
-
-        private void transformationCards(String input, String output) throws Exception {
-            float[] widths = { 85, 25, 165, 25, 195 };
-            float x = MARGIN;
-            String[][] cards = { { "INPUT", input }, { "PREDEFINED\nGREETING TEXT", "" }, { "OUTPUT", output } };
-            ensureSpace(95);
-            for (int index = 0; index < widths.length; index++) {
-                if (index == 1 || index == 3) {
-                    rect(x, y - 95, widths[index], 95, Color.WHITE, BORDER);
-                    centered(index == 1 ? "+" : "->", x + widths[index] / 2, y - 52, boldFont, 13, NAVY);
-                } else {
-                    int cardIndex = index / 2;
-                    rect(x, y - 95, widths[index], 95, cardIndex == 1 ? LIGHT_GREY : LIGHT_BLUE, BORDER);
-                    wrapped(cards[cardIndex][0], x + 10, y - 35, widths[index] - 20, boldFont, 12, NAVY, 14);
-                    wrapped(cards[cardIndex][1], x + 10, y - 67, widths[index] - 20, regularFont, 11, NAVY, 14);
-                }
-                x += widths[index];
-            }
-            y -= 95;
         }
 
         private void sectionHeading(String title) throws Exception {
@@ -759,10 +739,6 @@ public class DocumentGenerationService {
             stream.moveTo(x1, y1);
             stream.lineTo(x2, y2);
             stream.stroke();
-        }
-
-        private static JsonNode first(JsonNode array) {
-            return array.isArray() && !array.isEmpty() ? array.get(0) : array;
         }
 
         private static String firstText(JsonNode array) {
