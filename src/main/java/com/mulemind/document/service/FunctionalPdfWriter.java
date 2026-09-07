@@ -113,21 +113,21 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         y -= wrapped("A functional view that explains the application's purpose, business flow, interfaces, integrations, transformations, and error handling, derived exclusively from the evidence available in the supplied application metadata.",
                 MARGIN, y, CONTENT_WIDTH, regularFont, 11, TEXT, 15);
         y -= 27;
-        JsonNode interfaces = data.path("interfaces");
-        String interfaceSummary = interfaces.isArray()
-                ? interfaces.size() + (interfaces.size() == 1 ? " interface" : " interfaces")
-                : "No interfaces specified";
+        JsonNode interfacesJson = data.path("interfaces");
+        String interfaceSummary = interfacesJson.isArray()
+                ? interfacesJson.size() + (interfacesJson.size() == 1 ? " API" : " APIs")
+                : "No APIs specified";
         metadataCard(new String[][] {
                 { "APPLICATION NAME", value(data, "applicationName") },
                 { "BUSINESS CAPABILITY", value(data, "businessCapability") },
                 { "APIs", interfaceSummary },
-                { "ENDPOINTS", interfaces.isArray() && !interfaces.isEmpty()
-                        ? "See interface specifications" : "None specified" }
+                { "ENDPOINTS", interfacesJson.isArray() && !interfacesJson.isEmpty()
+                        ? "See API specifications" : "None specified" }
         });
         purposeCard(value(data, "purpose"));
         heading("DOCUMENT MAP", 15);
         table(new String[][] {
-                { "01", "Business Flow", "02", "Interface" },
+                { "01", "Business Flow", "02", "APIs" },
                 { "03", "Limitations & Open Question", "04", "Error Scenarios" },
                 { "05", "Integrations", "", "" }
         }, new float[] { 38, 209.5f, 38, 209.5f }, LIGHT_GREY);
