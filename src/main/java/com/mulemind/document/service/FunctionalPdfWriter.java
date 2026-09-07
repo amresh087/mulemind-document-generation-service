@@ -30,10 +30,24 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Private constructor used internally to create a new instance of FunctionalPdfWriter with the specified parameters.
+     * @param document
+     * @param regularFont
+     * @param boldFont
+     * @param applicationName
+     */
     private FunctionalPdfWriter(PDDocument document, PDFont regularFont, PDFont boldFont, String applicationName) {
         super(document, regularFont, boldFont, applicationName);
         this.objectMapper = null;
     }
+
+    /**
+     * Renders a functional documentation PDF based on the provided MetadataGeneratedEvent.
+     * @param event The MetadataGeneratedEvent containing the documentation data.
+     * @return A byte array representing the generated PDF document.
+     * @throws Exception If an error occurs during PDF generation or parsing the documentation.
+     */
 
     public byte[] renderFunctionalDocPdf(MetadataGeneratedEvent event) throws Exception {
         JsonNode documentation = parseDocumentation(event.getDocumentation());
@@ -57,6 +71,13 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         }
     }
 
+
+    /**
+     * Parses the raw documentation string into a JsonNode.
+     * @param rawDocumentation The raw documentation string to parse.
+     * @return A JsonNode representing the parsed documentation.
+     * @throws Exception If the documentation is empty or not a valid JSON object.
+     */
     private JsonNode parseDocumentation(String rawDocumentation) throws Exception {
         if (rawDocumentation == null || rawDocumentation.isBlank()) {
             throw new IllegalArgumentException("Generated documentation is empty");
@@ -78,6 +99,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         return documentation;
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void addCover(JsonNode data) throws Exception {
         newPage(false);
         text("FUNCTIONAL DOCUMENT", MARGIN, 690, boldFont, 31, NAVY);
@@ -107,6 +134,13 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         finishPage();
     }
 
+
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void addBusinessFlow(JsonNode data) throws Exception {
         newPage(true);
         sectionHeading("01 | Business Flow");
@@ -120,6 +154,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         finishPage();
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void addInterface(JsonNode data) throws Exception {
         JsonNode interfaces = data.path("interfaces");
         if (!interfaces.isArray() || interfaces.isEmpty()) {
@@ -158,6 +198,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         }
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void addTransformationDetails(JsonNode transformations) throws Exception {
         if (!transformations.isArray()) return;
         for (JsonNode transformation : transformations) {
@@ -166,6 +212,13 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         }
     }
 
+
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void addLimitations(JsonNode data) throws Exception {
         newPage(true);
         sectionHeading("03 | Limitations & Open Question");
@@ -178,6 +231,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         finishPage();
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void addErrorScenariosSection(JsonNode data) throws Exception {
         newPage(true);
         sectionHeading("04 | Error Scenarios");
@@ -191,6 +250,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         finishPage();
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void addIntegrationsSection(JsonNode data) throws Exception {
         newPage(true);
         sectionHeading("05 | Integrations");
@@ -204,6 +269,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         finishPage();
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void errorScenarioCard(JsonNode scenario) throws Exception {
         String[][] fields = {
                 { "CONDITION", value(scenario, "condition") },
@@ -225,6 +296,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         setCurrentY(currentY() - height);
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private void integrationCard(JsonNode integration) throws Exception {
         String[][] fields = {
                 { "TYPE", value(integration, "type") },
@@ -248,6 +325,11 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         setCurrentY(currentY() - height);
     }
 
+    /**
+     * Creates a metadata card with the specified values.
+     * @param values The values to display in the card.
+     * @throws Exception If an error occurs while creating the card.
+     */
     private void metadataCard(String[][] values) throws Exception {
         float width = CONTENT_WIDTH / 4f;
         float height = 52;
@@ -264,6 +346,12 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         setCurrentY(currentY() - height);
     }
 
+    /**
+     * Creates a numbered card with the specified number and description.
+     * @param number The number to display on the card.
+     * @param description The description to display on the card.
+     * @throws Exception If an error occurs while creating the card.
+     */
     private void numberedCard(String number, String description) throws Exception {
         float height = Math.max(43, wrappedHeight(description, CONTENT_WIDTH - 65, regularFont, 10, 14) + 20);
         ensureSpace(height);
@@ -274,6 +362,10 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         setCurrentY(currentY() - height);
     }
 
+    /**
+     * Creates a flow card with the specified values.
+     * @throws Exception If an error occurs while creating the card.
+     */
     private void flowCards() throws Exception {
         ensureSpace(105);
         float[] widths = { 112, 24, 215, 24, 120 };
@@ -297,12 +389,24 @@ public class FunctionalPdfWriter extends BasePdfWriter {
         setCurrentY(currentY() - 105);
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private List<String[]> inputRows(JsonNode inputs) {
         List<String[]> rows = new ArrayList<>();
         for (JsonNode input : inputs) rows.add(new String[] { value(input, "name"), value(input, "source"), value(input, "required") });
         return rows;
     }
 
+    /**
+     * Retrieves the value of a specified field from a JsonNode.
+     * @param node The JsonNode to retrieve the value from.
+     * @param fieldName The name of the field to retrieve.
+     * @return The value of the specified field as a string, or an empty string if the field is missing or null.
+     */
     private List<String[]> outputRows(JsonNode outputs) {
         List<String[]> rows = new ArrayList<>();
         for (JsonNode output : outputs) rows.add(new String[] { value(output, "name"), value(output, "destination") });
