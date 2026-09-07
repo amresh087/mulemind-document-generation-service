@@ -42,6 +42,13 @@ public class DocumentGenerationService {
     @Value("${minio.bucket-name}")
     private String bucketName;
 
+    /**
+     * Generates a PDF document based on the provided MetadataGeneratedEvent, stores it in MinIO, and saves the result in the database.
+     *
+     * @param event The MetadataGeneratedEvent containing information for generating the PDF.
+     * @return The object name of the stored PDF in MinIO.
+     * @throws Exception If an error occurs during PDF generation or storage.
+     */
     public String generateAndStore(MetadataGeneratedEvent event) throws Exception {
         String objectName = buildObjectName(event);
         byte[] pdf = renderPdf(event);
@@ -66,6 +73,11 @@ public class DocumentGenerationService {
         return objectName;
     }
 
+    /**
+     * Saves a failed document generation result in the database.
+     *
+     * @param event The MetadataGeneratedEvent containing information about the failed document generation.
+     */
     public void saveFailedResult(MetadataGeneratedEvent event) {
         documentResultRepository.save(ProjectDocumentResult.builder()
                 .documentId(event.getDocumentId())
@@ -77,6 +89,13 @@ public class DocumentGenerationService {
                 .build());
     }
 
+    /**
+     * Renders a PDF document based on the provided MetadataGeneratedEvent.
+     *
+     * @param event The MetadataGeneratedEvent containing information for generating the PDF.
+     * @return A byte array representing the generated PDF.
+     * @throws Exception If an error occurs during PDF generation.
+     */
     private byte[] renderPdf(MetadataGeneratedEvent event) throws Exception {
 
         String documentationType = event.getDocumentationType();
@@ -185,12 +204,24 @@ public class DocumentGenerationService {
         }
     }
 
+    /**
+     * Ensures that the specified MinIO bucket exists. If it does not exist, it creates the bucket.
+     *
+     * @throws Exception If an error occurs while checking or creating the bucket.
+     */
     private void ensureBucketExists() throws Exception {
         if (!minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build())) {
             minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
         }
     }
 
+    /**
+     * Parses the raw documentation string into a JsonNode.
+     *
+     * @param rawDocumentation The raw documentation string to parse.
+     * @return A JsonNode representing the parsed documentation.
+     * @throws Exception If the raw documentation is empty or not a valid JSON object.
+     */
     private JsonNode parseDocumentation(String rawDocumentation) throws Exception {
         if (rawDocumentation == null || rawDocumentation.isBlank()) {
             throw new IllegalArgumentException("Generated documentation is empty");
@@ -212,6 +243,12 @@ public class DocumentGenerationService {
         return documentation;
     }
 
+    /**
+     * Builds the object name for storing the PDF in MinIO based on the provided MetadataGeneratedEvent.
+     *
+     * @param event The MetadataGeneratedEvent containing information for generating the object name.
+     * @return The constructed object name for storing the PDF in MinIO.
+     */
     private String buildObjectName(MetadataGeneratedEvent event) {
         String documentName = sanitizePathPart(event.getDocumentName(), "documentation");
         int extensionIndex = documentName.lastIndexOf('.');
@@ -224,6 +261,13 @@ public class DocumentGenerationService {
                 + documentName + "_" + documentationType + ".pdf";
     }
 
+    /**
+     * Sanitizes a string value to be used as a part of a file path by replacing certain characters and providing a fallback value.
+     *
+     * @param value The string value to sanitize.
+     * @param fallback The fallback value to use if the input value is null or blank.
+     * @return The sanitized string value suitable for use in a file path.
+     */
     private String sanitizePathPart(String value, String fallback) {
         if (value == null || value.isBlank()) {
             return fallback;
@@ -231,10 +275,19 @@ public class DocumentGenerationService {
         return value.replaceAll("[/\\\\]+", "_").replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
+    /**
+     * Safely converts an object to a string, returning an empty string if the object is null.
+     *
+     * @param value The object to convert to a string.
+     * @return The string representation of the object, or an empty string if the object is null.
+     */
     private String safe(Object value) {
         return value == null ? "" : value.toString();
     }
 
+    /**
+     * A helper class for writing content to a PDF document using Apache PDFBox.
+     */
     private static final class PdfWriter {
         private final PDDocument document;
         private PDPage page;
@@ -246,6 +299,14 @@ public class DocumentGenerationService {
             openPage();
         }
 
+        /**
+         * Writes a line of text to the PDF document.
+         *
+         * @param text The text to write.
+         * @param font The font to use.
+         * @param fontSize The font size.
+         * @throws Exception If an error occurs while writing the text.
+         */
         private void writeLine(String text, PDFont font, float fontSize) throws Exception {
             if (y < 55) {
                 closePage();
@@ -259,6 +320,14 @@ public class DocumentGenerationService {
             y -= fontSize == 16 ? 24 : LINE_HEIGHT;
         }
 
+        /**
+         * Writes a line of text to the PDF document, wrapping it if necessary.
+         *
+         * @param text The text to write.
+         * @param font The font to use.
+         * @param fontSize The font size.
+         * @throws Exception If an error occurs while writing the text.
+         */
         private void writeWrappedLine(String text, PDFont font, float fontSize) throws Exception {
             String remaining = text;
             while (remaining.length() > 105) {
@@ -272,6 +341,9 @@ public class DocumentGenerationService {
             writeLine(remaining, font, fontSize);
         }
 
+        /**
+         * Opens a new page in the PDF document.
+         */
         private void openPage() {
             page = new PDPage(PDRectangle.A4);
             document.addPage(page);
@@ -283,6 +355,11 @@ public class DocumentGenerationService {
             y = page.getMediaBox().getHeight() - MARGIN;
         }
 
+        /**
+         * Closes the current page in the PDF document.
+         *
+         * @throws Exception If an error occurs while closing the page.
+         */
         private void closePage() throws Exception {
             if (contentStream != null) {
                 contentStream.close();
@@ -290,6 +367,12 @@ public class DocumentGenerationService {
             }
         }
 
+        /**
+         * Sanitizes a string by replacing non-ASCII characters with a question mark.
+         *
+         * @param text The string to sanitize.
+         * @return The sanitized string.
+         */
         private static String sanitize(String text) {
             return text == null ? "" : text.replaceAll("[^\\x00-\\x7F]", "?");
         }
