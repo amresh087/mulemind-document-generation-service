@@ -37,7 +37,7 @@ public class DocumentGenerationService {
     private final MinioClient minioClient;
     private final ObjectMapper objectMapper;
     private final ProjectDocumentResultRepository documentResultRepository;
-    private final FunctionalDocument functionalDocument;
+    private final FunctionalPdfWriter functionalPdfWriter;
 
     @Value("${minio.bucket-name}")
     private String bucketName;
@@ -81,7 +81,7 @@ public class DocumentGenerationService {
 
         String documentationType = event.getDocumentationType();
         if (documentationType != null && DocumentationType.FUNCTIONAL_DOC.name().equalsIgnoreCase(documentationType)) {
-            return functionalDocument.renderFunctionalDocPdf(event);
+            return functionalPdfWriter.renderFunctionalDocPdf(event);
         } else if (documentationType != null
                 && DocumentationType.TECHNICAL_DOC.name().equalsIgnoreCase(documentationType)) {
             return renderTechnicalDocPdf(event);
