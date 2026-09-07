@@ -14,6 +14,8 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +35,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class DocumentGenerationService {
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentGenerationService.class);
 
     private static final float MARGIN = 50;
     private static final float FONT_SIZE = 10;
@@ -107,7 +111,9 @@ public class DocumentGenerationService {
      * @throws Exception
      */
     public byte[] renderFunctionalDocPdf(MetadataGeneratedEvent event) throws Exception {
-        JsonNode documentation = objectMapper.readTree(event.getDocumentation());
+        JsonNode documentation = parseDocumentation(event.getDocumentation());
+        log.info("Rendering functional documentation documentId={}, fields={}", event.getDocumentId(),
+            documentation.fieldNames());
 
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PDFont regularFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
@@ -134,7 +140,7 @@ public class DocumentGenerationService {
      */
     public byte[] renderTechnicalDocPdf(MetadataGeneratedEvent event) throws Exception {
 
-        JsonNode documentation = objectMapper.readTree(event.getDocumentation());
+        JsonNode documentation = parseDocumentation(event.getDocumentation());
         String formattedDocumentation = objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(documentation);
 
@@ -164,7 +170,7 @@ public class DocumentGenerationService {
      */
     public byte[] renderFlowDocPdf(MetadataGeneratedEvent event) throws Exception {
 
-        JsonNode documentation = objectMapper.readTree(event.getDocumentation());
+        JsonNode documentation = parseDocumentation(event.getDocumentation());
         String formattedDocumentation = objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(documentation);
 
@@ -193,7 +199,7 @@ public class DocumentGenerationService {
      */
     public byte[] renderSequenceDocPdf(MetadataGeneratedEvent event) throws Exception {
 
-        JsonNode documentation = objectMapper.readTree(event.getDocumentation());
+        JsonNode documentation = parseDocumentation(event.getDocumentation());
         String formattedDocumentation = objectMapper.writerWithDefaultPrettyPrinter()
                 .writeValueAsString(documentation);
 
@@ -218,6 +224,27 @@ public class DocumentGenerationService {
         if (!minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build())) {
             minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
         }
+    }
+
+    private JsonNode parseDocumentation(String rawDocumentation) throws Exception {
+        if (rawDocumentation == null || rawDocumentation.isBlank()) {
+            throw new IllegalArgumentException("Generated documentation is empty");
+        }
+
+        String content = rawDocumentation.trim();
+        if (content.startsWith("```")) {
+            int firstLineEnd = content.indexOf('\n');
+            int closingFence = content.lastIndexOf("```");
+            if (firstLineEnd > 0 && closingFence > firstLineEnd) {
+                content = content.substring(firstLineEnd + 1, closingFence).trim();
+            }
+        }
+
+        JsonNode documentation = objectMapper.readTree(content);
+        if (documentation == null || !documentation.isObject()) {
+            throw new IllegalArgumentException("Generated documentation must be a JSON object");
+        }
+        return documentation;
     }
 
     private String buildObjectName(MetadataGeneratedEvent event) {
@@ -279,9 +306,9 @@ public class DocumentGenerationService {
             y -= 34;
             text(applicationName, MARGIN, y, regularFont, 22, TEAL);
             y -= 43;
-            text("A functional view that explains the application's purpose, business flow, interfaces, integrations, transformations, and error handling, derived exclusively from the evidence available in the supplied application metadata.",
-                    MARGIN, y, regularFont, 11, TEXT);
-            y -= 42;
+                y -= wrapped("A functional view that explains the application's purpose, business flow, interfaces, integrations, transformations, and error handling, derived exclusively from the evidence available in the supplied application metadata.",
+                    MARGIN, y, CONTENT_WIDTH, regularFont, 11, TEXT, 15);
+                y -= 27;
 
                 JsonNode interfaces = data.path("interfaces");
                 String interfaceSummary = interfaces.isArray()
@@ -436,10 +463,11 @@ public class DocumentGenerationService {
                     { "RESPONSE", value(scenario, "response") }
             };
             float contentWidth = CONTENT_WIDTH - 25;
-            float height = 58;
+            float height = 77;
             for (String[] field : fields) {
-                height += wrappedHeight(field[1], contentWidth, regularFont, 10, 14) + 18;
+                height += wrappedHeight(field[1], contentWidth, regularFont, 10, 14) + 34;
             }
+            ensureSpace(height);
             rect(MARGIN, y - height, CONTENT_WIDTH, height, AMBER, new Color(239, 211, 145));
             text(value(scenario, "scenario"), MARGIN + 16, y - 28, boldFont, 16, NAVY);
             float fieldY = y - 65;
@@ -460,10 +488,11 @@ public class DocumentGenerationService {
                     { "DESTINATION", value(integration, "destination") },
                     { "BUSINESS PURPOSE", value(integration, "businessPurpose") }
             };
-            float height = 58;
+            float height = 77;
             for (String[] field : fields) {
-                height += wrappedHeight(field[1], CONTENT_WIDTH - 25, regularFont, 10, 14) + 18;
+                height += wrappedHeight(field[1], CONTENT_WIDTH - 25, regularFont, 10, 14) + 34;
             }
+            ensureSpace(height);
             rect(MARGIN, y - height, CONTENT_WIDTH, height, LIGHT_GREY, BORDER);
             text(value(integration, "name"), MARGIN + 16, y - 28, boldFont, 16, NAVY);
             float fieldY = y - 65;
@@ -478,7 +507,11 @@ public class DocumentGenerationService {
 
         private void metadataCard(String[][] values) throws Exception {
             float width = CONTENT_WIDTH / 4f;
-            float height = 78;
+            float height = 52;
+            for (String[] value : values) {
+                height = Math.max(height, wrappedHeight(value[1], width - 20, boldFont, 13, 15) + 52);
+            }
+            ensureSpace(height);
             rect(MARGIN, y - height, CONTENT_WIDTH, height, LIGHT_GREY, BORDER);
             for (int index = 0; index < values.length; index++) {
                 float x = MARGIN + index * width;
@@ -491,6 +524,7 @@ public class DocumentGenerationService {
 
         private void numberedCard(String number, String description) throws Exception {
             float height = Math.max(43, wrappedHeight(description, CONTENT_WIDTH - 65, regularFont, 10, 14) + 20);
+            ensureSpace(height);
             rect(MARGIN, y - height, CONTENT_WIDTH, height, Color.WHITE, BORDER);
             rect(MARGIN, y - height, 48, height, BLUE, BLUE);
             centered(number, MARGIN + 24, y - height / 2 + 4, boldFont, 12, Color.WHITE);
@@ -503,6 +537,7 @@ public class DocumentGenerationService {
             float x = MARGIN;
             String[][] cards = { { "CUSTOMER", "Submits request" }, { "APPLICATION", "Captures name\nConstructs greeting\nProcesses request" },
                     { "CALLER", "Receives message" } };
+                ensureSpace(105);
             for (int index = 0; index < widths.length; index++) {
                 if (index == 1 || index == 3) {
                     rect(x, y - 105, widths[index], 105, Color.WHITE, BORDER);
@@ -523,6 +558,7 @@ public class DocumentGenerationService {
             float[] widths = { 85, 25, 165, 25, 195 };
             float x = MARGIN;
             String[][] cards = { { "INPUT", input }, { "PREDEFINED\nGREETING TEXT", "" }, { "OUTPUT", output } };
+            ensureSpace(95);
             for (int index = 0; index < widths.length; index++) {
                 if (index == 1 || index == 3) {
                     rect(x, y - 95, widths[index], 95, Color.WHITE, BORDER);
@@ -549,10 +585,15 @@ public class DocumentGenerationService {
         }
 
         private void paragraph(String value) throws Exception {
-            y -= wrapped(value, MARGIN, y, CONTENT_WIDTH, regularFont, 10, TEXT, 14);
+            for (String line : wrap(value, regularFont, 10, CONTENT_WIDTH)) {
+                ensureSpace(14);
+                text(line, MARGIN, y, regularFont, 10, TEXT);
+                y -= 14;
+            }
         }
 
         private void filledBanner(String value) throws Exception {
+            ensureSpace(54);
             rect(MARGIN, y - 54, CONTENT_WIDTH, 54, NAVY, NAVY);
             centered(value, MARGIN + CONTENT_WIDTH / 2, y - 31, boldFont, 12, Color.WHITE);
             y -= 54;
@@ -560,6 +601,7 @@ public class DocumentGenerationService {
 
         private void purposeCard(String value) throws Exception {
             float height = Math.max(82, wrappedHeight(value, CONTENT_WIDTH - 20, regularFont, 10, 14) + 52);
+            ensureSpace(height);
             rect(MARGIN, y - height, CONTENT_WIDTH, height, LIGHT_BLUE, BORDER);
             text("PURPOSE", MARGIN + 10, y - 22, boldFont, 10, TEXT);
             wrapped(value, MARGIN + 10, y - 50, CONTENT_WIDTH - 20, regularFont, 10, TEXT, 14);
@@ -569,6 +611,7 @@ public class DocumentGenerationService {
         private void labelledCard(String label, String value, Color fill, Color border, float minHeight) throws Exception {
             float labelWidth = label == null ? 0 : 135;
             float height = Math.max(minHeight, wrappedHeight(value, CONTENT_WIDTH - labelWidth - 25, regularFont, 10, 14) + 24);
+            ensureSpace(height);
             rect(MARGIN, y - height, CONTENT_WIDTH, height, fill, border);
             if (label != null) {
                 rect(MARGIN, y - height, labelWidth, height, fill, fill);
@@ -581,6 +624,7 @@ public class DocumentGenerationService {
         private void table(String[][] rows, float[] widths, Color fill) throws Exception {
             for (String[] row : rows) {
                 float height = rowHeight(row, widths, regularFont, 10);
+                ensureSpace(height);
                 float x = MARGIN;
                 for (int index = 0; index < row.length; index++) {
                     rect(x, y - height, widths[index], height, fill, BORDER);
@@ -663,6 +707,12 @@ public class DocumentGenerationService {
             if (withHeader) {
                 rect(0, 819, PDRectangle.A4.getWidth(), 23, NAVY, NAVY);
                 y = 770;
+            }
+        }
+
+        private void ensureSpace(float height) throws Exception {
+            if (stream != null && y - height < 52) {
+                newPage(true);
             }
         }
 
